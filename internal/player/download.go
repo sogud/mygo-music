@@ -14,7 +14,7 @@ import (
 // Song is a track's audio found for the listener to keep a copy of, in a file
 // of their own: kept in the cache, a file on disk, or at its source.
 type Song struct {
-	// Type is its file's: mp3, flac or ogg, as its source said.
+	// Type is its file's: mp3, flac, ogg, aac or m4a, as its source said.
 	Type string
 	file *os.File      // kept in the cache, or on disk
 	st   *music.Stream // or else where it streams from
@@ -51,7 +51,7 @@ func (p *Player) FindSong(src music.Source, t music.Track, quality string) (*Son
 // anything.
 func songType(typ string) string {
 	switch typ = strings.ToLower(typ); typ {
-	case "mp3", "flac", "ogg":
+	case "mp3", "flac", "ogg", "aac", "m4a":
 		return typ
 	}
 	return "mp3"

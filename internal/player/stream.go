@@ -330,7 +330,7 @@ type stream interface {
 	source() (*download, *spectrum)
 }
 
-// openStream opens the song dl fetches, MP3, FLAC or Ogg Vorbis, as its first bytes
+// openStream opens the song dl fetches, MP3, FLAC, Ogg Vorbis, AAC or M4A, as its first bytes
 // say. An MP3 says nothing of its length: durationMs is it.
 func openStream(dl *download, durationMs int64) (stream, error) {
 	off := id3Size(dl)
@@ -341,6 +341,14 @@ func openStream(dl *download, durationMs int64) (stream, error) {
 		case "OggS":
 			return openOggStream(dl, durationMs)
 		}
+	}
+	dl.waitFor(off + 12)
+	head := dl.peek(off, 12)
+	if len(head) >= 8 && string(head[4:8]) == "ftyp" {
+		return openAACStream(dl, off, true)
+	}
+	if len(head) >= 2 && head[0] == 0xff && head[1]&0xf6 == 0xf0 {
+		return openAACStream(dl, off, false)
 	}
 	return openMP3Stream(dl, durationMs)
 }
@@ -363,6 +371,8 @@ func openShared(dl *download, durationMs int64) (stream, error) {
 	case *flacStream:
 		s.spec, s.drop = nil, dl.release
 	case *oggStream:
+		s.spec, s.drop = nil, dl.release
+	case *aacStream:
 		s.spec, s.drop = nil, dl.release
 	}
 	return s, nil

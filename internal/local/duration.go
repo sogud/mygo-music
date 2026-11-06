@@ -202,3 +202,86 @@ func oggDuration(r io.ReaderAt, size int64) (ms int64) {
 	}
 	return d.Length() * 1000 / int64(d.SampleRate())
 }
+
+// aacDuration walks ADTS headers without decoding the audio. Each raw block
+// contains 1024 samples; the sample rate is carried in every frame.
+func aacDuration(r io.ReaderAt, size int64) int64 {
+	rates := [...]int64{96000, 88200, 64000, 48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000, 7350}
+	var micros int64
+	for off := id3v2Size(r); off+7 <= size; {
+		var h [7]byte
+		if _, err := r.ReadAt(h[:], off); err != nil || h[0] != 0xff || h[1]&0xf6 != 0xf0 {
+			return 0
+		}
+		rate := int((h[2] >> 2) & 15)
+		length := int64(h[3]&3)<<11 | int64(h[4])<<3 | int64(h[5]>>5)
+		if rate >= len(rates) || length < 7 || length > size-off {
+			return 0
+		}
+		micros += 1024 * int64(1+(h[6]&3)) * 1000000 / rates[rate]
+		off += length
+	}
+	return micros / 1000
+}
+
+// m4aDuration reads the movie header, including a moov atom after the media
+// data. Large atoms are skipped with ReadAt rather than loaded into memory.
+func m4aDuration(r io.ReaderAt, size int64) int64 {
+	return mp4Duration(r, 0, size, false)
+}
+
+func mp4Duration(r io.ReaderAt, start, end int64, movie bool) int64 {
+	for off := start; off+8 <= end; {
+		var h [16]byte
+		if _, err := r.ReadAt(h[:8], off); err != nil {
+			return 0
+		}
+		length, header := int64(binary.BigEndian.Uint32(h[:4])), int64(8)
+		if length == 1 {
+			if _, err := r.ReadAt(h[8:], off+8); err != nil {
+				return 0
+			}
+			u := binary.BigEndian.Uint64(h[8:])
+			if u > uint64(end-off) {
+				return 0
+			}
+			length, header = int64(u), 16
+		} else if length == 0 {
+			length = end - off
+		}
+		if length < header || length > end-off {
+			return 0
+		}
+		kind := string(h[4:8])
+		if kind == "moov" && !movie {
+			return mp4Duration(r, off+header, off+length, true)
+		}
+		if kind == "mvhd" && movie {
+			var b [32]byte
+			if length-header < 20 {
+				return 0
+			}
+			if _, err := r.ReadAt(b[:20], off+header); err != nil {
+				return 0
+			}
+			scale, duration := uint64(binary.BigEndian.Uint32(b[12:16])), uint64(binary.BigEndian.Uint32(b[16:20]))
+			if b[0] == 1 {
+				if length-header < 32 {
+					return 0
+				}
+				if _, err := r.ReadAt(b[:], off+header); err != nil {
+					return 0
+				}
+				scale, duration = uint64(binary.BigEndian.Uint32(b[20:24])), binary.BigEndian.Uint64(b[24:32])
+			} else if b[0] != 0 {
+				return 0
+			}
+			if scale == 0 || duration > uint64(1<<63-1)/1000 {
+				return 0
+			}
+			return int64(duration * 1000 / scale)
+		}
+		off += length
+	}
+	return 0
+}

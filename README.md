@@ -14,6 +14,8 @@ A native desktop music player written in Go with [MyGo](https://github.com/egois
 - English and Simplified Chinese
 - Plugins can add accounts, catalogs, podcasts, stations, comments and pages of their own
 
+AAC (ADTS) and M4A files play on macOS through AudioToolbox, including local files and plugin streams. No external decoder or transcoding is needed. Files whose metadata is at the end, or streams without a known size, may need to finish downloading before playback starts.
+
 ## Build
 
 ```bash
@@ -100,7 +102,7 @@ Export a function for each thing the plugin does. Each takes one object of param
 | `likeComment` | `{trackId, commentId, on}` | |
 | `postComment` | `{trackId, text}` | `Comment` |
 | `lyrics` | `{id}` | `{lrc, translation}`, or `{lines}` with timed `words` |
-| `stream` | `{id, quality}` | `{url, type, headers, size, gain, peak}`, where `type` is `mp3`, `flac` or `ogg` |
+| `stream` | `{id, quality}` | `{url, type, headers, size, gain, peak}`, where `type` is `mp3`, `flac`, `ogg`, `aac` or `m4a` (`aac`/`m4a` playback requires macOS) |
 | `remotePlay` | `{ids, start, position}` | |
 | `remotePause`, `remoteResume` | | |
 | `remoteSeek` | `{position}` | |

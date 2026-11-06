@@ -1,5 +1,6 @@
 // Package local is the built-in source of music files on disk: the folders the
-// listener chose, scanned for .mp3, .flac and .ogg. What it lists is held in memory
+// listener chose, scanned for .mp3, .flac and .ogg, plus .aac and .m4a on macOS.
+// What it lists is held in memory
 // and swapped whole as a scan goes on, so asking never waits for one. What it
 // keeps is in its data directory: library.json is the listener's own (folders,
 // likes, playlists, what was played), index.json only saves reading the tags

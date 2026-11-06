@@ -240,6 +240,10 @@ func walk(ctx context.Context, folders []string) []found {
 			}
 			switch strings.ToLower(filepath.Ext(name)) {
 			case ".mp3", ".flac", ".ogg":
+			case ".aac", ".m4a":
+				if runtime.GOOS != "darwin" {
+					return nil
+				}
 			default:
 				return nil
 			}
@@ -338,6 +342,10 @@ func (s *Source) readFile(file found) (entry, bool) {
 		e.Duration = flacDuration(f)
 	case "ogg":
 		e.Duration = oggDuration(f, file.size)
+	case "aac":
+		e.Duration = aacDuration(f, file.size)
+	case "m4a":
+		e.Duration = m4aDuration(f, file.size)
 	default:
 		e.Duration = mp3Duration(f, file.size)
 	}
@@ -503,15 +511,21 @@ func coverExt(pic *tag.Picture) string {
 	return ""
 }
 
-// fileType says whether a file is an mp3, a flac or an ogg: by what it holds if that
+// fileType says whether a file is MP3, FLAC, Ogg, AAC or M4A: by what it holds if that
 // tells, and else by its name.
 func fileType(f io.ReaderAt, path string) string {
-	var head [4]byte
-	if _, err := f.ReadAt(head[:], id3v2Size(f)); err == nil && string(head[:]) == "fLaC" {
+	var head [8]byte
+	if _, err := f.ReadAt(head[:], id3v2Size(f)); err == nil && string(head[:4]) == "fLaC" {
 		return "flac"
 	}
-	if string(head[:]) == "OggS" {
+	if string(head[:4]) == "OggS" {
 		return "ogg"
+	}
+	if string(head[4:8]) == "ftyp" {
+		return "m4a"
+	}
+	if head[0] == 0xff && head[1]&0xf6 == 0xf0 {
+		return "aac"
 	}
 	if _, ok := parseFrameHeader(head[:]); ok {
 		return "mp3"
@@ -521,6 +535,10 @@ func fileType(f io.ReaderAt, path string) string {
 		return "flac"
 	case ".ogg":
 		return "ogg"
+	case ".aac":
+		return "aac"
+	case ".m4a":
+		return "m4a"
 	}
 	return "mp3"
 }
